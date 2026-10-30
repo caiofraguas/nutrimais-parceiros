@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}NutriMais – Gerenciar Nutricionistas{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i data-lucide="users" style="width:32px;height:32px;color:var(--gold-400)"></i>
+            Nutricionistas
+        </h1>
+        <p class="page-desc">Adicione, edite ou desative nutricionistas da equipe.</p>
+    </div>
+</section>
+
+<section class="nutri-section" id="nutri-section">
+    <!-- Add new -->
+    <div class="nutri-add-bar" id="nutri-add-bar">
+        <input type="text" id="new-nutri-name" class="form-input" placeholder="Nome da nova nutricionista..." />
+        <button class="btn-add" id="btn-add-nutri">
+            <i data-lucide="user-plus" style="width:18px;height:18px"></i>
+            Adicionar
+        </button>
+    </div>
+
+    <!-- List -->
+    <div class="nutri-list" id="nutri-list">
+        <!-- Populated via JS -->
+    </div>
+
+    <div id="nutri-empty" class="empty-state hidden">
+        <i data-lucide="user-x" style="width:56px;height:56px;color:var(--text-muted)"></i>
+        <h3>Nenhuma nutricionista cadastrada</h3>
+        <p>Adicione nutricionistas usando o campo acima.</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let nutricionistas = [];
+    let editingId = null;
+
+    async function loadNutris() {
+        const res = await fetch('/api/nutricionistas');
+        nutricionistas = await res.json();
+        renderNutris();
+    }
+
+    function renderNutris() {
+        const list = document.getElementById('nutri-list');
+        const empty = document.getElementById('nutri-empty');
+
+        if (nutricionistas.length === 0) {
+            list.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        empty.classList.add('hidden');
+        list.innerHTML = nutricionistas.map(n => {
+            const initials = n.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            const isEditing = editingId === n.id;
+
+            return `
+                <div class="nutri-card" id="nutri-card-${n.id}">
+                    <div class="nutri-avatar">${initials}</div>
+                    <div class="nutri-info" style="flex:1;display:flex;align-items:center;gap:12px;">
+                        ${isEditing
+                            ? `<input type="text" class="nutri-edit-input" id="edit-nutri-input-${n.id}" value="${n.nome}" onkeydown="if(event.key==='Enter')saveNutriName(${n.id})" />`
+                            : `<div>
+                                <div class="nutri-name">${n.nome}</div>
+                                <div class="nutri-status ${n.ativo ? 'active' : 'inactive'}">
+                                    ${n.ativo ? '● Ativa' : '○ Inativa'}
+                                </div>
+                              </div>`
+                        }
+                    </div>
+                    <div class="nutri-actions">
+                        ${isEditing
+                            ? `<button class="btn-save-inline" onclick="saveNutriName(${n.id})">
+                                <i data-lucide="check" style="width:14px;height:14px"></i> Salvar
+                              </button>
+                              <button class="btn-toggle" onclick="cancelEdit()">
+                                <i data-lucide="x" style="width:14px;height:14px"></i>
+                              </button>`
+                            : `<button class="btn-toggle" onclick="startEdit(${n.id})" title="Editar nome">
+                                <i data-lucide="pencil" style="width:14px;height:14px"></i> Editar
+                              </button>
+                              <button class="btn-toggle" onclick="toggleAtivo(${n.id}, ${n.ativo})" title="${n.ativo ? 'Desativar' : 'Ativar'}">
+                                <i data-lucide="${n.ativo ? 'eye-off' : 'eye'}" style="width:14px;height:14px"></i>
+                                ${n.ativo ? 'Desativar' : 'Ativar'}
+                              </button>
+                              <button class="btn-icon btn-delete" onclick="deleteNutri(${n.id}, '${n.nome.replace(/'/g, "\\'")}')" title="Excluir">
+                                <i data-lucide="trash-2"></i>
+                              </button>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+        lucide.createIcons();
+
+        // Focus edit input if editing
+        if (editingId) {
+            const input = document.getElementById(`edit-nutri-input-${editingId}`);
+            if (input) { input.focus(); input.select(); }
+        }
+    }
+
+    function startEdit(id) {
+        editingId = id;
+        renderNutris();
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        renderNutris();
+    }
+
+    async function saveNutriName(id) {
+        const input = document.getElementById(`edit-nutri-input-${id}`);
+        const nome = input.value.trim();
+        if (!nome) { showToast('Nome não pode ser vazio.', 'error'); return; }
+
+        const res = await fetch(`/api/nutricionistas/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome }),
+        });
+        if (res.ok) {
+            editingId = null;
+            showToast('Nome atualizado com sucesso!');
+            loadNutris();
+        } else {
+            showToast('Erro ao atualizar.', 'error');
+        }
+    }
+
+    async function toggleAtivo(id, currentAtivo) {
+        const res = await fetch(`/api/nutricionistas/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ativo: !currentAtivo }),
+        });
+        if (res.ok) {
+            showToast(currentAtivo ? 'Nutricionista desativada.' : 'Nutricionista ativada!');
+            loadNutris();
+        }
+    }
+
+    async function deleteNutri(id, nome) {
+        if (!confirm(`Excluir "${nome}"? Esta ação não pode ser desfeita.`)) return;
+        const res = await fetch(`/api/nutricionistas/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Nutricionista excluída.');
+            loadNutris();
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Erro ao excluir.', 'error');
+        }
+    }
+
+    // Add new
+    document.getElementById('btn-add-nutri').addEventListener('click', async () => {
+        const input = document.getElementById('new-nutri-name');
+        const nome = input.value.trim();
+        if (!nome) { showToast('Informe o nome da nutricionista.', 'error'); return; }
+
+        const res = await fetch('/api/nutricionistas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome }),
+        });
+        if (res.ok) {
+            showToast('Nutricionista adicionada com sucesso!');
+            input.value = '';
+            loadNutris();
+        } else {
+            showToast('Erro ao adicionar.', 'error');
+        }
+    });
+
+    document.getElementById('new-nutri-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('btn-add-nutri').click();
+    });
+
+    loadNutris();
+</script>
+{% endblock %}

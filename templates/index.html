@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}NutriMais – Cadastro de Parceiros Estratégicos{% endblock %}
+
+{% block content %}
+<!-- ── Hero Section ──────────────────────────────────────────────── -->
+<section class="hero" id="hero-section">
+    <div class="hero-bg-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+    </div>
+    <div class="hero-content">
+        <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="NutriMais" class="hero-logo" />
+        <span class="hero-badge">
+            <i data-lucide="shield-check" style="width:16px;height:16px"></i>
+            Vigilância Sanitária
+        </span>
+        <h1 class="hero-title">Cadastro de<br/><span class="gradient-text">Parceiros Estratégicos</span></h1>
+        <p class="hero-subtitle">Registre e gerencie parceiros do segmento alimentício com avaliações, dados de contato e controle completo pela equipe de nutricionistas.</p>
+        <a href="#form-section" class="hero-cta" id="hero-cta-btn">
+            <i data-lucide="plus-circle" style="width:20px;height:20px"></i>
+            Cadastrar Parceiro
+        </a>
+    </div>
+</section>
+
+{% if is_admin %}
+<!-- ── Stats Cards (Admin Only) ─────────────────────────────────── -->
+<section class="stats-section" id="stats-section">
+    <div class="stats-grid">
+        <div class="stat-card" id="stat-total">
+            <div class="stat-icon-wrap green">
+                <i data-lucide="building-2"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-total-num">0</span>
+                <span class="stat-label">Parceiros Cadastrados</span>
+            </div>
+        </div>
+        <div class="stat-card" id="stat-avg">
+            <div class="stat-icon-wrap amber">
+                <i data-lucide="star"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-avg-num">0.0</span>
+                <span class="stat-label">Avaliação Média</span>
+            </div>
+        </div>
+        <div class="stat-card" id="stat-segments">
+            <div class="stat-icon-wrap purple">
+                <i data-lucide="layers"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-segments-num">0</span>
+                <span class="stat-label">Segmentos</span>
+            </div>
+        </div>
+        <div class="stat-card" id="stat-nutris">
+            <div class="stat-icon-wrap teal">
+                <i data-lucide="heart-pulse"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-nutris-num">0</span>
+                <span class="stat-label">Nutricionistas Ativas</span>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- ── Registration Form ────────────────────────────────────────── -->
+<section class="form-section" id="form-section">
+    <div class="form-container">
+        <div class="form-header">
+            <h2 class="form-title">
+                <i data-lucide="clipboard-plus" style="width:28px;height:28px;color:var(--primary)"></i>
+                Novo Parceiro
+            </h2>
+            <p class="form-desc">Preencha os dados abaixo para registrar um novo parceiro estratégico.</p>
+        </div>
+
+        <form id="partner-form" class="partner-form" novalidate>
+            <!-- 1 · Segmentação -->
+            <div class="form-group" id="fg-segmentacao">
+                <label class="form-label" for="segmentacao">
+                    <i data-lucide="tag" class="label-icon"></i>
+                    Segmentação
+                </label>
+                <select id="segmentacao" name="segmentacao" class="form-select" required>
+                    <option value="" disabled selected>Selecione o segmento...</option>
+                    {% for s in segmentacoes %}
+                    <option value="{{ s.nome }}">{{ s.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 2 · Nome da Empresa -->
+            <div class="form-group" id="fg-nome-empresa">
+                <label class="form-label" for="nome_empresa">
+                    <i data-lucide="building-2" class="label-icon"></i>
+                    Nome da Empresa
+                </label>
+                <input type="text" id="nome_empresa" name="nome_empresa" class="form-input" placeholder="Ex: Restaurante Sabor & Saúde" required />
+            </div>
+
+            <!-- 3 · Dados do Responsável -->
+            <fieldset class="form-fieldset" id="fg-responsavel">
+                <legend class="fieldset-legend">
+                    <i data-lucide="user" class="label-icon"></i>
+                    Dados do Responsável
+                </legend>
+                <div class="fieldset-grid">
+                    <div class="form-group">
+                        <label class="form-label-sm" for="responsavel_nome">Nome completo</label>
+                        <input type="text" id="responsavel_nome" name="responsavel_nome" class="form-input" placeholder="Nome do responsável" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label-sm" for="responsavel_telefone">Telefone</label>
+                        <input type="tel" id="responsavel_telefone" name="responsavel_telefone" class="form-input" placeholder="(00) 00000-0000" oninput="phoneMask(this)" required />
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label-sm" for="responsavel_email">E-mail</label>
+                        <input type="email" id="responsavel_email" name="responsavel_email" class="form-input" placeholder="email@empresa.com" required />
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- 4 · Avaliação -->
+            <div class="form-group" id="fg-avaliacao">
+                <label class="form-label">
+                    <i data-lucide="star" class="label-icon"></i>
+                    Avaliação do Parceiro
+                </label>
+                <div class="star-rating" id="star-rating">
+                    <input type="hidden" id="avaliacao" name="avaliacao" value="0" />
+                    <button type="button" class="star-btn" data-value="1" aria-label="1 estrela"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="2" aria-label="2 estrelas"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="3" aria-label="3 estrelas"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="4" aria-label="4 estrelas"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="5" aria-label="5 estrelas"><i data-lucide="star"></i></button>
+                    <span class="star-label" id="star-label">Selecione uma avaliação</span>
+                </div>
+            </div>
+
+            <!-- 5 · Nutricionista -->
+            <div class="form-group" id="fg-nutricionista">
+                <label class="form-label" for="nutricionista_id">
+                    <i data-lucide="heart-pulse" class="label-icon"></i>
+                    Nutricionista que está indicando
+                </label>
+                <select id="nutricionista_id" name="nutricionista_id" class="form-select" required>
+                    <option value="" disabled selected>Selecione a nutricionista...</option>
+                    {% for n in nutricionistas %}
+                    <option value="{{ n.id }}">{{ n.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn-submit" id="btn-submit">
+                <i data-lucide="save" style="width:20px;height:20px"></i>
+                Cadastrar Parceiro
+            </button>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── Star rating ─────────────────────────────────────────────────
+    const starLabels = ['', 'Ruim', 'Regular', 'Bom', 'Muito Bom', 'Excelente'];
+    const starBtns = document.querySelectorAll('.star-btn');
+    const starInput = document.getElementById('avaliacao');
+    const starLabel = document.getElementById('star-label');
+    let currentRating = 0;
+
+    starBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentRating = parseInt(btn.dataset.value);
+            starInput.value = currentRating;
+            updateStars();
+        });
+        btn.addEventListener('mouseenter', () => {
+            highlightStars(parseInt(btn.dataset.value));
+        });
+    });
+
+    document.getElementById('star-rating').addEventListener('mouseleave', () => {
+        updateStars();
+    });
+
+    function highlightStars(val) {
+        starBtns.forEach(b => {
+            const v = parseInt(b.dataset.value);
+            const active = v <= val;
+            b.classList.toggle('active', active);
+            const icon = b.querySelector('svg') || b.querySelector('i');
+            if (icon) {
+                if (active) {
+                    icon.style.fill = '#F59E0B';
+                    icon.style.stroke = '#B48E28';
+                    icon.style.color = '#D4AF37';
+                } else {
+                    icon.style.fill = '#F3F4F6';
+                    icon.style.stroke = '#9CA3AF';
+                    icon.style.color = '#D1D5DB';
+                }
+            }
+        });
+        starLabel.textContent = starLabels[val] || 'Selecione uma avaliação';
+    }
+
+    function updateStars() {
+        highlightStars(currentRating);
+    }
+
+    // ── Stats loader (safe for admin view) ──────────────────────────
+    async function loadStats() {
+        const totalEl = document.getElementById('stat-total-num');
+        if (!totalEl) return;
+        try {
+            const res = await fetch('/api/parceiros');
+            const data = await res.json();
+            totalEl.textContent = data.length;
+            if (data.length > 0) {
+                const avg = data.reduce((s, p) => s + p.avaliacao, 0) / data.length;
+                const avgEl = document.getElementById('stat-avg-num');
+                if (avgEl) avgEl.textContent = avg.toFixed(1);
+            }
+            const segs = new Set(data.map(p => p.segmentacao));
+            const segsEl = document.getElementById('stat-segments-num');
+            if (segsEl) segsEl.textContent = segs.size;
+
+            const nRes = await fetch('/api/nutricionistas');
+            const nutris = await nRes.json();
+            const nutrisEl = document.getElementById('stat-nutris-num');
+            if (nutrisEl) nutrisEl.textContent = nutris.filter(n => n.ativo).length;
+        } catch (e) {
+            console.error('Erro ao carregar estatísticas', e);
+        }
+    }
+    loadStats();
+
+    // ── Form submit ─────────────────────────────────────────────────
+    document.getElementById('partner-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const btn = document.getElementById('btn-submit');
+
+        // Validation
+        if (!form.segmentacao.value) { showToast('Selecione a segmentação.', 'error'); return; }
+        if (!form.nome_empresa.value.trim()) { showToast('Informe o nome da empresa.', 'error'); return; }
+        if (!form.responsavel_nome.value.trim()) { showToast('Informe o nome do responsável.', 'error'); return; }
+        if (!form.responsavel_telefone.value.trim()) { showToast('Informe o telefone de contato.', 'error'); return; }
+        if (!form.responsavel_email.value.trim()) { showToast('Informe o e-mail do responsável.', 'error'); return; }
+        if (parseInt(starInput.value) < 1) { showToast('Selecione uma avaliação de 1 a 5.', 'error'); return; }
+        if (!form.nutricionista_id.value) { showToast('Selecione a nutricionista.', 'error'); return; }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Cadastrando...';
+
+        try {
+            const res = await fetch('/api/parceiros', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    segmentacao: form.segmentacao.value,
+                    nome_empresa: form.nome_empresa.value.trim(),
+                    responsavel_nome: form.responsavel_nome.value.trim(),
+                    responsavel_telefone: form.responsavel_telefone.value.trim(),
+                    responsavel_email: form.responsavel_email.value.trim(),
+                    avaliacao: parseInt(starInput.value),
+                    nutricionista_id: parseInt(form.nutricionista_id.value),
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Erro ao cadastrar.');
+            }
+
+            showToast('Parceiro cadastrado com sucesso!', 'success');
+            form.reset();
+            currentRating = 0;
+            updateStars();
+            loadStats();
+        } catch (err) {
+            showToast(err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="save" style="width:20px;height:20px"></i> Cadastrar Parceiro';
+            lucide.createIcons();
+        }
+    });
+
+    // Smooth scroll for CTA
+    document.getElementById('hero-cta-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('form-section').scrollIntoView({ behavior: 'smooth' });
+    });
+</script>
+{% endblock %}

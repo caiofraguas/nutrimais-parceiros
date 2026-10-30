@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}NutriMais – Gerenciar Segmentações{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i data-lucide="layers" style="width:32px;height:32px;color:var(--gold-400)"></i>
+            Segmentações
+        </h1>
+        <p class="page-desc">Adicione novas áreas de atuação, edite nomes e oculte ou reexiba opções no formulário de cadastro.</p>
+    </div>
+</section>
+
+<section class="nutri-section" id="segmentacoes-section">
+    <!-- Add new segmentation -->
+    <div class="nutri-add-bar" id="seg-add-bar">
+        <input type="text" id="new-seg-name" class="form-input" placeholder="Nome da nova segmentação (ex: AVCB, Dedetização)..." />
+        <button class="btn-add" id="btn-add-seg">
+            <i data-lucide="plus" style="width:18px;height:18px"></i>
+            Adicionar
+        </button>
+    </div>
+
+    <!-- Segmentations List -->
+    <div class="nutri-list" id="seg-list">
+        <!-- Populated via JS -->
+    </div>
+
+    <div id="seg-empty" class="empty-state hidden">
+        <i data-lucide="layers" style="width:56px;height:56px;color:var(--text-muted)"></i>
+        <h3>Nenhuma segmentação cadastrada</h3>
+        <p>Adicione uma nova segmentação no campo acima.</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let segmentacoes = [];
+    let editingId = null;
+
+    async function loadSegmentacoes() {
+        try {
+            const res = await fetch('/api/segmentacoes');
+            segmentacoes = await res.json();
+            renderSegmentacoes();
+        } catch (e) {
+            showToast('Erro ao carregar segmentações.', 'error');
+        }
+    }
+
+    function renderSegmentacoes() {
+        const list = document.getElementById('seg-list');
+        const empty = document.getElementById('seg-empty');
+
+        if (segmentacoes.length === 0) {
+            list.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        empty.classList.add('hidden');
+        list.innerHTML = segmentacoes.map(s => {
+            const isEditing = editingId === s.id;
+
+            return `
+                <div class="nutri-card" id="seg-card-${s.id}" style="${!s.ativo ? 'opacity: 0.75; background: #fbfbfb;' : ''}">
+                    <div class="nutri-avatar" style="background: ${s.ativo ? 'linear-gradient(135deg, var(--gold-600) 0%, var(--gold-800) 100%)' : '#9ca3af'};">
+                        <i data-lucide="tag" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <div class="nutri-info" style="flex:1;display:flex;align-items:center;gap:12px;">
+                        ${isEditing
+                            ? `<input type="text" class="nutri-edit-input" id="edit-seg-input-${s.id}" value="${s.nome}" onkeydown="if(event.key==='Enter')saveSegName(${s.id})" />`
+                            : `<div>
+                                <div class="nutri-name">${s.nome}</div>
+                                <div class="nutri-status ${s.ativo ? 'active' : 'inactive'}">
+                                    ${s.ativo ? '● Visível no cadastro' : '○ Oculta no cadastro'}
+                                </div>
+                              </div>`
+                        }
+                    </div>
+                    <div class="nutri-actions">
+                        ${isEditing
+                            ? `<button class="btn-save-inline" onclick="saveSegName(${s.id})">
+                                <i data-lucide="check" style="width:14px;height:14px"></i> Salvar
+                              </button>
+                              <button class="btn-toggle" onclick="cancelEdit()">
+                                <i data-lucide="x" style="width:14px;height:14px"></i>
+                              </button>`
+                            : `<button class="btn-toggle" onclick="startEdit(${s.id})" title="Editar nome">
+                                <i data-lucide="pencil" style="width:14px;height:14px"></i> Editar
+                              </button>
+                              <button class="btn-toggle" onclick="toggleAtivo(${s.id}, ${s.ativo})" title="${s.ativo ? 'Ocultar esta opção do cadastro' : 'Reexibir no cadastro'}">
+                                <i data-lucide="${s.ativo ? 'eye-off' : 'eye'}" style="width:14px;height:14px"></i>
+                                ${s.ativo ? 'Ocultar' : 'Reexibir'}
+                              </button>
+                              <button class="btn-icon btn-delete" onclick="deleteSeg(${s.id}, '${s.nome.replace(/'/g, "\\'")}')" title="Excluir">
+                                <i data-lucide="trash-2"></i>
+                              </button>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+        lucide.createIcons();
+
+        if (editingId) {
+            const input = document.getElementById(`edit-seg-input-${editingId}`);
+            if (input) { input.focus(); input.select(); }
+        }
+    }
+
+    function startEdit(id) {
+        editingId = id;
+        renderSegmentacoes();
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        renderSegmentacoes();
+    }
+
+    async function saveSegName(id) {
+        const input = document.getElementById(`edit-seg-input-${id}`);
+        const nome = input.value.trim();
+        if (!nome) { showToast('Nome não pode ser vazio.', 'error'); return; }
+
+        try {
+            const res = await fetch(`/api/segmentacoes/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                editingId = null;
+                showToast('Segmentação atualizada com sucesso!');
+                loadSegmentacoes();
+            } else {
+                showToast(data.error || 'Erro ao atualizar.', 'error');
+            }
+        } catch (e) {
+            showToast('Erro ao atualizar.', 'error');
+        }
+    }
+
+    async function toggleAtivo(id, currentAtivo) {
+        try {
+            const res = await fetch(`/api/segmentacoes/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ativo: !currentAtivo }),
+            });
+            if (res.ok) {
+                showToast(currentAtivo ? 'Segmentação ocultada do cadastro.' : 'Segmentação reexibida no cadastro!');
+                loadSegmentacoes();
+            }
+        } catch (e) {
+            showToast('Erro ao alterar visibilidade.', 'error');
+        }
+    }
+
+    async function deleteSeg(id, nome) {
+        if (!confirm(`Excluir a segmentação "${nome}"? Se houver parceiros cadastrados, sugerimos apenas ocultá-la.`)) return;
+        try {
+            const res = await fetch(`/api/segmentacoes/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (res.ok) {
+                showToast('Segmentação excluída com sucesso.');
+                loadSegmentacoes();
+            } else {
+                showToast(data.error || 'Erro ao excluir.', 'error');
+            }
+        } catch (e) {
+            showToast('Erro ao excluir.', 'error');
+        }
+    }
+
+    // Add new segmentation
+    document.getElementById('btn-add-seg').addEventListener('click', async () => {
+        const input = document.getElementById('new-seg-name');
+        const nome = input.value.trim();
+        if (!nome) { showToast('Informe o nome da segmentação.', 'error'); return; }
+
+        try {
+            const res = await fetch('/api/segmentacoes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast('Segmentação adicionada com sucesso!');
+                input.value = '';
+                loadSegmentacoes();
+            } else {
+                showToast(data.error || 'Erro ao adicionar.', 'error');
+            }
+        } catch (e) {
+            showToast('Erro ao adicionar.', 'error');
+        }
+    });
+
+    document.getElementById('new-seg-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('btn-add-seg').click();
+    });
+
+    loadSegmentacoes();
+</script>
+{% endblock %}

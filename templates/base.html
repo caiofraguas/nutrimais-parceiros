@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="NutriMais Parceiros – Plataforma de Cadastro de Parceiros Estratégicos para Vigilância Sanitária" />
+    <title>{% block title %}NutriMais Parceiros{% endblock %}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet" />
+
+    <!-- Lucide Icons (CDN) -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- ── Navigation ───────────────────────────────────────────── -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="NutriMais Logo" class="logo-img" />
+                <span class="logo-text">Nutri<span class="logo-accent">Mais</span></span>
+            </a>
+            <div class="nav-links">
+                <a href="/" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" id="nav-home">
+                    <i data-lucide="plus-circle" class="nav-icon"></i>
+                    Cadastrar
+                </a>
+
+                {% if is_admin %}
+                <a href="/dashboard" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
+                    id="nav-dashboard">
+                    <i data-lucide="layout-dashboard" class="nav-icon"></i>
+                    Dashboard
+                </a>
+                <a href="/nutricionistas"
+                    class="nav-link {% if request.endpoint == 'nutricionistas_page' %}active{% endif %}"
+                    id="nav-nutricionistas">
+                    <i data-lucide="users" class="nav-icon"></i>
+                    Nutricionistas
+                </a>
+                <a href="/segmentacoes"
+                    class="nav-link {% if request.endpoint == 'segmentacoes_page' %}active{% endif %}"
+                    id="nav-segmentacoes">
+                    <i data-lucide="layers" class="nav-icon"></i>
+                    Segmentações
+                </a>
+                <span class="admin-badge-indicator" title="Você está na visão completa de Administrador">
+                    <i data-lucide="shield-check" style="width:14px;height:14px;"></i>
+                    Admin
+                </span>
+                <a href="/api/admin/logout" class="btn-admin-exit"
+                    title="Voltar para a visão exclusiva de nutricionista">
+                    <i data-lucide="log-out" style="width:14px;height:14px;"></i>
+                    Sair
+                </a>
+                {% else %}
+                <!-- Visão Nutricionista (Apenas Cadastro) -->
+                <button type="button" class="btn-admin-access" onclick="openAdminModal()"
+                    title="Acessar painel administrativo com senha">
+                    <i data-lucide="lock" style="width:14px;height:14px;"></i>
+                    Área Admin
+                </button>
+                {% endif %}
+            </div>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Abrir menu">
+                <i data-lucide="menu"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ── Modal de Acesso do Administrador ────────────────────────── -->
+    <div class="modal-overlay" id="admin-login-modal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i data-lucide="shield" style="width:22px;height:22px;color:var(--primary)"></i>
+                    Acesso Administrativo
+                </h3>
+                <button class="modal-close" onclick="closeAdminModal()" aria-label="Fechar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="admin-login-form" class="modal-form" onsubmit="handleAdminLogin(event)">
+                <div class="form-group">
+                    <label class="form-label-sm" for="admin-password-input">Digite a senha de administrador</label>
+                    <input type="password" id="admin-password-input" class="form-input" placeholder="Senha de acesso..."
+                        required autofocus />
+                    <small style="color:var(--text-muted); font-size:0.78rem; margin-top:4px;">
+                        Dica: a senha padrão é <strong>nutrimais2026</strong>
+                    </small>
+                </div>
+                <div class="modal-actions" style="margin-top:12px;">
+                    <button type="button" class="btn-cancel" onclick="closeAdminModal()">Cancelar</button>
+                    <button type="submit" class="btn-submit btn-sm" id="btn-admin-login-submit">
+                        <i data-lucide="key" style="width:16px;height:16px"></i>
+                        Entrar como Admin
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Main content ─────────────────────────────────────────── -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- ── Footer ───────────────────────────────────────────────── -->
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; 2026 NutriMais Parceiros. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- ── Toast container ──────────────────────────────────────── -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        // Lucide icons init
+        lucide.createIcons();
+
+        // Mobile nav toggle
+        const navToggle = document.getElementById('nav-toggle');
+        const navLinks = document.querySelector('.nav-links');
+        if (navToggle) {
+            navToggle.addEventListener('click', () => {
+                navLinks.classList.toggle('open');
+            });
+        }
+
+        // Toast helper
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <i data-lucide="${type === 'success' ? 'check-circle' : 'alert-circle'}" class="toast-icon"></i>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 3500);
+        }
+
+        // Phone mask
+        function phoneMask(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.slice(0, 11);
+            if (v.length > 6) {
+                v = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
+            } else if (v.length > 2) {
+                v = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+            } else if (v.length > 0) {
+                v = `(${v}`;
+            }
+            input.value = v;
+        }
+
+        // Admin Login Modal Handlers
+        function openAdminModal() {
+            const modal = document.getElementById('admin-login-modal');
+            if (modal) {
+                modal.classList.add('open');
+                const inp = document.getElementById('admin-password-input');
+                if (inp) {
+                    inp.value = '';
+                    setTimeout(() => inp.focus(), 150);
+                }
+            }
+        }
+
+        function closeAdminModal() {
+            const modal = document.getElementById('admin-login-modal');
+            if (modal) modal.classList.remove('open');
+        }
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            const passwordInput = document.getElementById('admin-password-input');
+            const submitBtn = document.getElementById('btn-admin-login-submit');
+            const senha = passwordInput.value.trim();
+
+            if (!senha) {
+                showToast('Digite a senha de administrador.', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Verificando...';
+
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senha }),
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showToast('Acesso concedido! Carregando visão administrativa...');
+                    closeAdminModal();
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 600);
+                } else {
+                    showToast(data.error || 'Senha incorreta.', 'error');
+                    passwordInput.focus();
+                    passwordInput.select();
+                }
+            } catch (err) {
+                showToast('Erro ao validar senha.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="key" style="width:16px;height:16px"></i> Entrar como Admin';
+                lucide.createIcons();
+            }
+        }
+
+        // Open modal if redirected due to login_required
+        {% if login_required %}
+        document.addEventListener('DOMContentLoaded', () => {
+            openAdminModal();
+            showToast('Esta área requer acesso de administrador.', 'error');
+        });
+        {% endif %}
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

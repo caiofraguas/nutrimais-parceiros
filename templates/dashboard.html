@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% block title %}NutriMais – Dashboard de Parceiros{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">
+            <i data-lucide="layout-dashboard" style="width:32px;height:32px;color:var(--primary)"></i>
+            Dashboard de Parceiros
+        </h1>
+        <p class="page-desc">Visualize, filtre e gerencie todos os parceiros estratégicos cadastrados.</p>
+    </div>
+</section>
+
+<!-- ── Filters ───────────────────────────────────────────────────── -->
+<section class="filters-section" id="filters-section">
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label class="filter-label" for="filter-search">
+                <i data-lucide="search" style="width:16px;height:16px"></i>
+            </label>
+            <input type="text" id="filter-search" class="filter-input" placeholder="Buscar por nome, empresa ou e-mail..." />
+        </div>
+        <div class="filter-group">
+            <select id="filter-segmento" class="filter-select">
+                <option value="">Todos os segmentos</option>
+                {% for s in segmentacoes %}
+                <option value="{{ s.nome }}">{{ s.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="filter-nutricionista" class="filter-select">
+                <option value="">Todas as nutricionistas</option>
+                {% for n in nutricionistas %}
+                <option value="{{ n.id }}">{{ n.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="filter-avaliacao" class="filter-select">
+                <option value="">Todas as avaliações</option>
+                <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+                <option value="4">⭐⭐⭐⭐ (4)</option>
+                <option value="3">⭐⭐⭐ (3)</option>
+                <option value="2">⭐⭐ (2)</option>
+                <option value="1">⭐ (1)</option>
+            </select>
+        </div>
+        <button class="btn-clear-filters" id="btn-clear-filters" title="Limpar filtros">
+            <i data-lucide="x" style="width:16px;height:16px"></i>
+            Limpar
+        </button>
+    </div>
+</section>
+
+<!-- ── Results count & Export ───────────────────────────────────── -->
+<section class="results-info" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <span id="results-count" class="results-count">Carregando parceiros...</span>
+    <button type="button" class="btn-export-excel" id="btn-export-excel" onclick="exportarExcel()" title="Baixar relatório formatado em Excel com ranking e segmentações">
+        <i data-lucide="file-spreadsheet" style="width: 18px; height: 18px;"></i>
+        Exportar Excel (.xlsx)
+    </button>
+</section>
+
+<!-- ── Table ─────────────────────────────────────────────────────── -->
+<section class="table-section" id="table-section">
+    <div class="table-wrapper">
+        <table class="data-table" id="partners-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Segmento</th>
+                    <th>Empresa</th>
+                    <th>Responsável</th>
+                    <th>Telefone</th>
+                    <th>E-mail</th>
+                    <th>Avaliação</th>
+                    <th>Nutricionista</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Populated via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state hidden">
+        <i data-lucide="inbox" style="width:64px;height:64px;color:var(--text-muted)"></i>
+        <h3>Nenhum parceiro encontrado</h3>
+        <p>Cadastre parceiros na <a href="/">página principal</a> ou ajuste os filtros.</p>
+    </div>
+</section>
+
+<!-- ── Edit Modal ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i data-lucide="edit-3" style="width:22px;height:22px;color:var(--primary)"></i>
+                Editar Parceiro
+            </h3>
+            <button class="modal-close" id="modal-close" aria-label="Fechar">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <form id="edit-form" class="partner-form modal-form">
+            <input type="hidden" id="edit-id" />
+            <div class="form-group">
+                <label class="form-label-sm" for="edit-segmentacao">Segmentação</label>
+                <select id="edit-segmentacao" class="form-select" required>
+                    {% for s in segmentacoes %}
+                    <option value="{{ s.nome }}">{{ s.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label-sm" for="edit-nome_empresa">Nome da Empresa</label>
+                <input type="text" id="edit-nome_empresa" class="form-input" required />
+            </div>
+            <div class="fieldset-grid">
+                <div class="form-group">
+                    <label class="form-label-sm" for="edit-responsavel_nome">Responsável</label>
+                    <input type="text" id="edit-responsavel_nome" class="form-input" required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label-sm" for="edit-responsavel_telefone">Telefone</label>
+                    <input type="tel" id="edit-responsavel_telefone" class="form-input" oninput="phoneMask(this)" required />
+                </div>
+                <div class="form-group full-width">
+                    <label class="form-label-sm" for="edit-responsavel_email">E-mail</label>
+                    <input type="email" id="edit-responsavel_email" class="form-input" required />
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label-sm">Avaliação</label>
+                <div class="star-rating" id="edit-star-rating">
+                    <input type="hidden" id="edit-avaliacao" value="0" />
+                    <button type="button" class="star-btn" data-value="1" aria-label="1 estrela"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="2" aria-label="2 estrelas"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="3" aria-label="3 estrelas"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="4" aria-label="4 estrelas"><i data-lucide="star"></i></button>
+                    <button type="button" class="star-btn" data-value="5" aria-label="5 estrelas"><i data-lucide="star"></i></button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label-sm" for="edit-nutricionista_id">Nutricionista</label>
+                <select id="edit-nutricionista_id" class="form-select" required>
+                    {% for n in nutricionistas %}
+                    <option value="{{ n.id }}">{{ n.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" id="btn-modal-cancel">Cancelar</button>
+                <button type="submit" class="btn-submit btn-sm">
+                    <i data-lucide="check" style="width:18px;height:18px"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Delete confirmation modal ─────────────────────────────────── -->
+<div class="modal-overlay" id="delete-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3 class="modal-title" style="color:var(--danger)">
+                <i data-lucide="trash-2" style="width:22px;height:22px"></i>
+                Confirmar Exclusão
+            </h3>
+        </div>
+        <p class="modal-body-text">Tem certeza que deseja excluir o parceiro <strong id="delete-name"></strong>?</p>
+        <div class="modal-actions">
+            <button class="btn-cancel" id="btn-delete-cancel">Cancelar</button>
+            <button class="btn-danger" id="btn-delete-confirm">
+                <i data-lucide="trash-2" style="width:16px;height:16px"></i>
+                Excluir
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── State ───────────────────────────────────────────────────────
+    let allPartners = [];
+    let editRating = 0;
+    let deleteId = null;
+
+    // ── Load data ───────────────────────────────────────────────────
+    async function loadPartners() {
+        const params = new URLSearchParams();
+        const busca = document.getElementById('filter-search').value.trim();
+        const seg = document.getElementById('filter-segmento').value;
+        const nutri = document.getElementById('filter-nutricionista').value;
+        const aval = document.getElementById('filter-avaliacao').value;
+
+        if (busca) params.set('busca', busca);
+        if (seg) params.set('segmentacao', seg);
+        if (nutri) params.set('nutricionista_id', nutri);
+        if (aval) params.set('avaliacao', aval);
+
+        const res = await fetch(`/api/parceiros?${params.toString()}`);
+        allPartners = await res.json();
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('table-body');
+        const emptyState = document.getElementById('empty-state');
+        const count = document.getElementById('results-count');
+
+        if (allPartners.length === 0) {
+            tbody.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            count.textContent = 'Nenhum parceiro encontrado';
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+        count.textContent = `${allPartners.length} parceiro${allPartners.length > 1 ? 's' : ''} encontrado${allPartners.length > 1 ? 's' : ''}`;
+
+        tbody.innerHTML = allPartners.map((p, i) => `
+            <tr>
+                <td class="cell-num">${i + 1}</td>
+                <td><span class="badge badge-seg">${p.segmentacao}</span></td>
+                <td class="cell-bold">${p.nome_empresa}</td>
+                <td>${p.responsavel_nome}</td>
+                <td class="cell-mono">${p.responsavel_telefone}</td>
+                <td class="cell-email">${p.responsavel_email}</td>
+                <td class="cell-stars">${renderStars(p.avaliacao)}</td>
+                <td><span class="badge badge-nutri">${p.nutricionista_nome}</span></td>
+                <td class="cell-date">${p.criado_em}</td>
+                <td class="cell-actions">
+                    <button class="btn-icon btn-edit" onclick="openEdit(${p.id})" title="Editar">
+                        <i data-lucide="pencil"></i>
+                    </button>
+                    <button class="btn-icon btn-delete" onclick="openDelete(${p.id}, '${p.nome_empresa.replace(/'/g, "\\'")}')" title="Excluir">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function renderStars(n) {
+        return Array.from({length: 5}, (_, i) =>
+            `<span class="table-star ${i < n ? 'filled' : ''}">&starf;</span>`
+        ).join('');
+    }
+
+    // ── Filters ─────────────────────────────────────────────────────
+    let debounceTimer;
+    document.getElementById('filter-search').addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(loadPartners, 300);
+    });
+    document.getElementById('filter-segmento').addEventListener('change', loadPartners);
+    document.getElementById('filter-nutricionista').addEventListener('change', loadPartners);
+    document.getElementById('filter-avaliacao').addEventListener('change', loadPartners);
+    document.getElementById('btn-clear-filters').addEventListener('click', () => {
+        document.getElementById('filter-search').value = '';
+        document.getElementById('filter-segmento').value = '';
+        document.getElementById('filter-nutricionista').value = '';
+        document.getElementById('filter-avaliacao').value = '';
+        loadPartners();
+    });
+
+    // ── Edit modal ──────────────────────────────────────────────────
+    const editModal = document.getElementById('edit-modal');
+    const editForm = document.getElementById('edit-form');
+
+    // Edit star rating
+    const editStarBtns = document.querySelectorAll('#edit-star-rating .star-btn');
+    function updateEditStarsVisual(rating) {
+        editStarBtns.forEach(b => {
+            const v = parseInt(b.dataset.value);
+            const active = v <= rating;
+            b.classList.toggle('active', active);
+            const icon = b.querySelector('svg') || b.querySelector('i');
+            if (icon) {
+                if (active) {
+                    icon.style.fill = '#F59E0B';
+                    icon.style.stroke = '#B48E28';
+                    icon.style.color = '#D4AF37';
+                } else {
+                    icon.style.fill = '#F3F4F6';
+                    icon.style.stroke = '#9CA3AF';
+                    icon.style.color = '#D1D5DB';
+                }
+            }
+        });
+    }
+
+    editStarBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            editRating = parseInt(btn.dataset.value);
+            document.getElementById('edit-avaliacao').value = editRating;
+            updateEditStarsVisual(editRating);
+        });
+    });
+
+    function openEdit(id) {
+        const p = allPartners.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById('edit-id').value = p.id;
+        document.getElementById('edit-segmentacao').value = p.segmentacao;
+        document.getElementById('edit-nome_empresa').value = p.nome_empresa;
+        document.getElementById('edit-responsavel_nome').value = p.responsavel_nome;
+        document.getElementById('edit-responsavel_telefone').value = p.responsavel_telefone;
+        document.getElementById('edit-responsavel_email').value = p.responsavel_email;
+        document.getElementById('edit-nutricionista_id').value = p.nutricionista_id;
+
+        editRating = p.avaliacao;
+        document.getElementById('edit-avaliacao').value = editRating;
+        updateEditStarsVisual(editRating);
+
+        editModal.classList.add('open');
+    }
+
+    function closeEditModal() { editModal.classList.remove('open'); }
+    document.getElementById('modal-close').addEventListener('click', closeEditModal);
+    document.getElementById('btn-modal-cancel').addEventListener('click', closeEditModal);
+    editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditModal(); });
+
+    editForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('edit-id').value;
+        const res = await fetch(`/api/parceiros/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                segmentacao: document.getElementById('edit-segmentacao').value,
+                nome_empresa: document.getElementById('edit-nome_empresa').value,
+                responsavel_nome: document.getElementById('edit-responsavel_nome').value,
+                responsavel_telefone: document.getElementById('edit-responsavel_telefone').value,
+                responsavel_email: document.getElementById('edit-responsavel_email').value,
+                avaliacao: parseInt(document.getElementById('edit-avaliacao').value),
+                nutricionista_id: parseInt(document.getElementById('edit-nutricionista_id').value),
+            }),
+        });
+        if (res.ok) {
+            showToast('Parceiro atualizado com sucesso!');
+            closeEditModal();
+            loadPartners();
+        } else {
+            showToast('Erro ao atualizar parceiro.', 'error');
+        }
+    });
+
+    // ── Delete modal ────────────────────────────────────────────────
+    const deleteModal = document.getElementById('delete-modal');
+
+    function openDelete(id, name) {
+        deleteId = id;
+        document.getElementById('delete-name').textContent = name;
+        deleteModal.classList.add('open');
+    }
+
+    function closeDeleteModal() { deleteModal.classList.remove('open'); deleteId = null; }
+    document.getElementById('btn-delete-cancel').addEventListener('click', closeDeleteModal);
+    deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) closeDeleteModal(); });
+
+    document.getElementById('btn-delete-confirm').addEventListener('click', async () => {
+        if (!deleteId) return;
+        const res = await fetch(`/api/parceiros/${deleteId}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Parceiro excluído com sucesso!');
+            closeDeleteModal();
+            loadPartners();
+        } else {
+            showToast('Erro ao excluir parceiro.', 'error');
+        }
+    });
+
+    // ── Export Excel ────────────────────────────────────────────────
+    function exportarExcel() {
+        const params = new URLSearchParams();
+        const busca = document.getElementById('filter-search').value.trim();
+        const seg = document.getElementById('filter-segmento').value;
+        const nutri = document.getElementById('filter-nutricionista').value;
+        const aval = document.getElementById('filter-avaliacao').value;
+
+        if (busca) params.set('busca', busca);
+        if (seg) params.set('segmentacao', seg);
+        if (nutri) params.set('nutricionista_id', nutri);
+        if (aval) params.set('avaliacao', aval);
+
+        showToast('Gerando planilha Excel segmentada e rankeada...');
+        window.location.href = `/api/parceiros/exportar?${params.toString()}`;
+    }
+
+    // ── Init ────────────────────────────────────────────────────────
+    loadPartners();
+</script>
+{% endblock %}
